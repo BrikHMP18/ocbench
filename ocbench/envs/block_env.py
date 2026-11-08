@@ -17,6 +17,8 @@ class BlockEnv(ManipulationEnv):
         goal_marker_size=None,
         goal_marker_line_width=0.01,
         success_hold_time=1.0,
+        object_sampling_bounds=None,
+        arm_init_pose=None,
         **kwargs,
     ):
         """Block environment.
@@ -35,6 +37,12 @@ class BlockEnv(ManipulationEnv):
                 scene and success. CPU environments only.
             goal_marker_line_width: Line width (m) of the goal square.
             success_hold_time: Seconds the strict success conditions must hold continuously.
+            object_sampling_bounds: Optional ((x_min, y_min), (x_max, y_max)) in metres: the area
+                where cubes start, sampled uniformly (yaw stays uniform). Default None keeps the
+                stock area ((0.20, -0.55), (0.62, 0.55)). CPU environments only.
+            arm_init_pose: Optional (x, y, z, yaw) of the effector at reset, gripper pointing
+                down; every episode then starts from this arm pose. Default None keeps the stock
+                random pose. CPU environments only.
         """
         self._env_type = env_type
         self._goal_marker_size = goal_marker_size
@@ -78,6 +86,16 @@ class BlockEnv(ManipulationEnv):
         self._arm_sampling_bounds = np.asarray([[0.18, -0.50, 0.20], [0.67, 0.50, 0.35]])
         self._object_sampling_bounds = np.asarray([[0.20, -0.55], [0.62, 0.55]])
         self._target_sampling_bounds = self._object_sampling_bounds
+        if object_sampling_bounds is not None:
+            # Set after the targets so only the start area changes.
+            self._object_sampling_bounds = np.asarray(object_sampling_bounds, dtype=float).reshape(2, 2)
+            if np.any(self._object_sampling_bounds[0] > self._object_sampling_bounds[1]):
+                raise ValueError(f'object_sampling_bounds must be (min, max), got {object_sampling_bounds}')
+        if arm_init_pose is not None:
+            # Degenerate bounds keep the random stream identical: one draw per value, as before.
+            x, y, z, yaw = (float(v) for v in arm_init_pose)
+            self._arm_sampling_bounds = np.asarray([[x, y, z], [x, y, z]])
+            self._arm_yaw_bounds = (yaw, yaw)
 
     def set_tasks(self):
         s = self._cube_size

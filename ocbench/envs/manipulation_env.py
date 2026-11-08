@@ -35,6 +35,7 @@ class ManipulationEnv(CustomMuJoCoEnv):
         self._effector_down_rotation = lie.SO3(np.asarray([0.0, 1.0, 0.0, 0.0]))
         self._workspace_bounds = np.asarray([[0.10, -0.65, 0.02], [0.75, 0.65, 0.45]])
         self._arm_sampling_bounds = np.asarray([[0.25, -0.35, 0.20], [0.6, 0.35, 0.35]])
+        self._arm_yaw_bounds = (-np.pi, np.pi)
         self._object_sampling_bounds = np.asarray([[0.3, -0.3], [0.55, 0.3]])
         self._target_sampling_bounds = np.asarray([[0.3, -0.3], [0.55, 0.3]])
         self._colors = dict(
@@ -263,7 +264,7 @@ class ManipulationEnv(CustomMuJoCoEnv):
         # Sample initial effector position and orientation.
         eff_pos = self.np_random.uniform(*self._arm_sampling_bounds)
         cur_ori = self._effector_down_rotation
-        yaw = self.np_random.uniform(-np.pi, np.pi)
+        yaw = self.np_random.uniform(*self._arm_yaw_bounds)
         rotz = lie.SO3.from_z_radians(yaw)
         eff_ori = rotz @ cur_ori
 

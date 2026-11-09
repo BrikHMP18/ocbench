@@ -19,6 +19,7 @@ class BlockEnv(ManipulationEnv):
         success_hold_time=1.0,
         object_sampling_bounds=None,
         arm_init_pose=None,
+        object_yaw_range=None,
         **kwargs,
     ):
         """Block environment.
@@ -43,6 +44,9 @@ class BlockEnv(ManipulationEnv):
             arm_init_pose: Optional (x, y, z, yaw) of the effector at reset, gripper pointing
                 down; every episode then starts from this arm pose. Default None keeps the stock
                 random pose. CPU environments only.
+            object_yaw_range: Optional (min, max) cube yaw at reset, in radians; (0, 0) gives
+                every cube the same orientation. Default None keeps the stock uniform yaw in
+                [0, 2*pi). CPU environments only.
         """
         self._env_type = env_type
         self._goal_marker_size = goal_marker_size
@@ -96,6 +100,8 @@ class BlockEnv(ManipulationEnv):
             x, y, z, yaw = (float(v) for v in arm_init_pose)
             self._arm_sampling_bounds = np.asarray([[x, y, z], [x, y, z]])
             self._arm_yaw_bounds = (yaw, yaw)
+        # One draw per cube either way, so the random stream does not change.
+        self._object_yaw_range = (0.0, 2 * np.pi) if object_yaw_range is None else tuple(map(float, object_yaw_range))
 
     def set_tasks(self):
         s = self._cube_size
@@ -184,7 +190,7 @@ class BlockEnv(ManipulationEnv):
                     break
             object_xys.append(xy)
             obj_pos = np.array((*xy, self._cube_size))
-            yaw = self.np_random.uniform(0, 2 * np.pi)
+            yaw = self.np_random.uniform(*self._object_yaw_range)
             obj_ori = lie.SO3.from_z_radians(yaw).wxyz.tolist()
             self._data.joint(f'object_joint_{i}').qpos[:3] = obj_pos
             self._data.joint(f'object_joint_{i}').qpos[3:] = obj_ori

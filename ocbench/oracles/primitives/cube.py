@@ -31,6 +31,12 @@ class CubePrimitive(Primitive):
         tilt_randomization = self._tilt_randomization
         noise_scale = 0.75**self._num_pick_retries
         use_pick_hold = np.random.uniform() < 0.4 * noise_scale
+        half_size = getattr(self._env.unwrapped, '_object_half_size', None)  # BlockEnv only.
+        is_cube = half_size is None or np.allclose(half_size, half_size[0])
+        # Blocks wider than the stock cube are grasped 2 cm above their centre: lower, the
+        # gripper linkage hits them.
+        wide = half_size is not None and half_size[1] > 0.03 + 1e-6
+        grasp_offset = np.array([0.0, 0.0, 0.02 if wide else 0.0])
 
         # Poses.
         poses = {}
@@ -40,8 +46,12 @@ class CubePrimitive(Primitive):
             eff_yaw=self.get_yaw(plan_input['effector_initial']),
             obj_yaw=self.get_yaw(plan_input['block_initial']),
             translation=plan_input['block_initial'].translation(),
+            n=4 if is_cube else 2,
         )
         yaw_mode = np.random.choice([-1, 0, 1], p=[0.15, 0.7, 0.15]) * np.pi / 2
+        if not is_cube:
+            # Always grasp across the block's second side (same random draws as for a cube).
+            yaw_mode = 0.0
         yaw_offset = self.yaw_error(self.get_yaw(block_initial_base), self.get_yaw(plan_input['block_initial']))
         yaw_offset += yaw_mode + np.random.uniform(-0.04, 0.04) * noise_scale
         if tilt_randomization:
@@ -53,7 +63,7 @@ class CubePrimitive(Primitive):
             pick_tilt = np.zeros(2)
             place_tilt = np.zeros(2)
         block_initial = self.to_pose(
-            pos=plan_input['block_initial'].translation(),
+            pos=plan_input['block_initial'].translation() + grasp_offset,
             yaw=self.get_yaw(plan_input['block_initial']) + yaw_offset,
             roll=pick_tilt[0],
             pitch=pick_tilt[1],
@@ -68,7 +78,7 @@ class CubePrimitive(Primitive):
 
         # Place.
         block_goal = self.to_pose(
-            pos=plan_input['block_goal'].translation(),
+            pos=plan_input['block_goal'].translation() + grasp_offset,
             yaw=self.get_yaw(plan_input['block_goal']) + yaw_offset,
             roll=place_tilt[0],
             pitch=place_tilt[1],

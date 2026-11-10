@@ -20,6 +20,7 @@ class BlockEnv(ManipulationEnv):
         object_sampling_bounds=None,
         arm_init_pose=None,
         object_yaw_range=None,
+        object_size=None,
         **kwargs,
     ):
         """Block environment.
@@ -47,6 +48,10 @@ class BlockEnv(ManipulationEnv):
             object_yaw_range: Optional (min, max) cube yaw at reset, in radians; (0, 0) gives
                 every cube the same orientation. Default None keeps the stock uniform yaw in
                 [0, 2*pi). CPU environments only.
+            object_size: Optional full side lengths (lx, ly, lz) in metres of every block.
+                Default None keeps the stock 6 cm cube. For a non-cube the scripted expert
+                always grasps across ly (no 90-degree grasp turns), 2 cm above the centre when
+                ly > 6 cm. CPU environments only.
         """
         self._env_type = env_type
         self._goal_marker_size = goal_marker_size
@@ -56,7 +61,11 @@ class BlockEnv(ManipulationEnv):
         self._success_hold_steps = 0
         if goal_marker_size is not None and env_type != 'single':
             raise ValueError('goal_marker_size is only supported for the single-cube task.')
-        self._cube_size = 0.03
+        # Half extents of every block; `_cube_size` stays the half height.
+        self._object_half_size = np.full(3, 0.03) if object_size is None else np.asarray(object_size, dtype=float) / 2
+        if self._object_half_size.shape != (3,) or np.any(self._object_half_size <= 0):
+            raise ValueError(f'object_size must be three positive lengths, got {object_size}')
+        self._cube_size = float(self._object_half_size[2])
         self._min_object_init_dist = 0.09
 
         if self._env_type == 'single':
@@ -198,7 +207,7 @@ class BlockEnv(ManipulationEnv):
     def add_objects(self, arena_mjcf):
         # Add cube scene.
         cube_outer_mjcf = mjcf.from_path((self._desc_dir / 'cube_outer.xml').as_posix())
-        cube_outer_mjcf.find('default', 'cube').geom.size = np.full(3, self._cube_size)
+        cube_outer_mjcf.find('default', 'cube').geom.size = self._object_half_size
         arena_mjcf.include_copy(cube_outer_mjcf)
 
         # Add `num_cubes` cubes to the scene.
@@ -279,7 +288,9 @@ class BlockEnv(ManipulationEnv):
         """Whether any cube could overlap the goal marker (used to resample initial states)."""
         if self._goal_marker_size is None:
             return False
-        clearance = self._goal_marker_size / 2 + self._goal_marker_line_width + self._cube_size * np.sqrt(2)
+        clearance = (
+            self._goal_marker_size / 2 + self._goal_marker_line_width + np.linalg.norm(self._object_half_size[:2])
+        )
         for i in range(self._num_cubes):
             xy = self._data.joint(f'object_joint_{i}').qpos[:2]
             if np.max(np.abs(xy - self._goal_marker_xy)) <= clearance:
@@ -293,7 +304,7 @@ class BlockEnv(ManipulationEnv):
         center = self._data.geom_xpos[gid]
         rot = self._data.geom_xmat[gid].reshape(3, 3)
         signs = np.array(list(itertools.product((-1.0, 1.0), repeat=3)))
-        corners = center + (signs * s) @ rot.T
+        corners = center + (signs * self._object_half_size) @ rot.T
         inside = bool(np.all(np.abs(corners[:, :2] - self._goal_marker_xy) <= self._goal_marker_size / 2))
         resting = bool(abs(center[2] - s) <= 0.005)
         released = True

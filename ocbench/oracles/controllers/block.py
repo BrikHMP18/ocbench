@@ -12,6 +12,7 @@ class BlockController(Controller):
         p_mistake=0.1,
         max_subgoal_steps=1250,
         speed_profile=(0.7, 1.0, 1.5),
+        grasp_turns=True,
     ):
         super().__init__(
             env=env,
@@ -20,6 +21,7 @@ class BlockController(Controller):
             speed_profile=speed_profile,
         )
         self._agent = None
+        self._grasp_turns = grasp_turns
         self._goal_order = None
         self._stack_anywhere_goal_xyzs = None
 
@@ -237,6 +239,7 @@ class BlockController(Controller):
         self._agent = CubePrimitive(
             env=self._env,
             segment_dt=self._segment_dt,
+            grasp_turns=self._grasp_turns,
         )
         self._goal_order = np.random.permutation(self._env.unwrapped._num_cubes)
         if self._env.unwrapped.cur_task_info['task_name'] == 'stack_anywhere':

@@ -17,7 +17,7 @@ class CubePrimitive(Primitive):
             segment_dt=segment_dt,
             target_peak_xyz_speed=target_peak_xyz_speed,
         )
-        self._grasp_turns = grasp_turns  # False: never turn the grasp by 90 degrees.
+        self._grasp_turns = grasp_turns  # False: never turn a cube grasp by 90 degrees; 'always': always.
         self._smooth_plan_stop_names = {'initial', 'pick_hold', 'place_start', 'place_end', 'final'}
         self._max_pick_retries = 2
         self._descent_height_range = (0.06, 0.22)
@@ -57,6 +57,8 @@ class CubePrimitive(Primitive):
         if not (is_cube and self._grasp_turns):
             # Non-cubes are always grasped across the same side (same random draws either way).
             yaw_mode = np.pi / 2 if turned else 0.0
+        elif self._grasp_turns == 'always':
+            yaw_mode = np.pi / 2  # Every cube grasp turned by 90 degrees (same random draws).
         yaw_offset = self.yaw_error(self.get_yaw(block_initial_base), self.get_yaw(plan_input['block_initial']))
         yaw_offset += yaw_mode + np.random.uniform(-0.04, 0.04) * noise_scale
         if tilt_randomization:

@@ -2,7 +2,7 @@
 
 ## Fork (BrikHMP18/ocbench)
 - BlockEnv: optional `object_size=(lx, ly, lz)` for non-cube blocks; the scripted expert then always grasps across `ly`, or across `lx` with a 90-degree turn when `ly` does not fit the 8.5 cm gripper.
-- BlockController: optional `grasp_turns=False` stops the expert from turning cube grasps by 90 degrees.
+- BlockController: optional `grasp_turns=False` stops the expert from turning cube grasps by 90 degrees; `grasp_turns='always'` turns every cube grasp by +90 degrees.
 
 ## ocbench 1.0.2 (2026-10-13)
 - Fix Switch collision-buffer overflow with MuJoCo 3.12+.

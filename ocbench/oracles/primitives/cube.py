@@ -35,9 +35,12 @@ class CubePrimitive(Primitive):
         use_pick_hold = np.random.uniform() < 0.4 * noise_scale
         half_size = getattr(self._env.unwrapped, '_object_half_size', None)  # BlockEnv only.
         is_cube = half_size is None or np.allclose(half_size, half_size[0])
+        # A block whose second side does not fit the 8.5 cm gripper is grasped across its first
+        # side, with a 90-degree turn.
+        turned = not is_cube and 2 * half_size[1] > 0.085
         # Blocks wider than the stock cube are grasped 2 cm above their centre: lower, the
         # gripper linkage hits them.
-        wide = half_size is not None and half_size[1] > 0.03 + 1e-6
+        wide = half_size is not None and half_size[0 if turned else 1] > 0.03 + 1e-6
         grasp_offset = np.array([0.0, 0.0, 0.02 if wide else 0.0])
 
         # Poses.
@@ -52,8 +55,8 @@ class CubePrimitive(Primitive):
         )
         yaw_mode = np.random.choice([-1, 0, 1], p=[0.15, 0.7, 0.15]) * np.pi / 2
         if not (is_cube and self._grasp_turns):
-            # Non-cubes are always grasped across their second side (same random draws either way).
-            yaw_mode = 0.0
+            # Non-cubes are always grasped across the same side (same random draws either way).
+            yaw_mode = np.pi / 2 if turned else 0.0
         yaw_offset = self.yaw_error(self.get_yaw(block_initial_base), self.get_yaw(plan_input['block_initial']))
         yaw_offset += yaw_mode + np.random.uniform(-0.04, 0.04) * noise_scale
         if tilt_randomization:
